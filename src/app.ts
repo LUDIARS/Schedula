@@ -9,21 +9,16 @@ import { notification } from "../modules/notification/routes.js";
 import { groupRoutes } from "../modules/group/routes.js";
 import { calendar } from "../modules/calendar/routes.js";
 import { eventRoutes } from "../modules/event/routes.js";
-import { taskRoutes } from "../modules/task/routes.js";
 import { placementRoutes } from "../modules/placement/routes.js";
 // myPlan / smart-scheduler / school / schedule(m1) / integrations は SDK module に移行
-import { pmModule } from "../modules/pm/index.js";
+// task / pm は Actio に分離 (2026-05-20 split-from-actio)
 import { dbViewer } from "./admin/db-viewer.js";
 import { externalApi } from "../modules/external-api/routes.js";
 import { settingsRoutes } from "../modules/settings/routes.js";
 import { secretsRoutes } from "../modules/secrets/routes.js";
 import { DAY_LABELS, getPeriodTime, PERIODS_COUNT } from "./shared/constants.js";
-import type { ActioModule } from "./shared/types.js";
 import { getRecentLogs } from "./activity-logger.js";
-import { getReservationPlugins } from "./reservation-plugins.js";
-import { registerReservationPlugin } from "./reservation-plugins.js";
 import { getEventPlugins } from "./event-plugins.js";
-import { getTaskPlugins } from "./task-plugins.js";
 import { secretManager } from "./config/secrets.js";
 import { setupRoutes } from "../modules/setup/routes.js";
 import { profileRoutes } from "../modules/profile/routes.js";
@@ -149,8 +144,7 @@ export function createApp() {
   // ─── Core: Events (予定: 時間拘束のある未来の事象) ─────────
   app.route("/api/events", eventRoutes);
 
-  // ─── Core: Tasks (タスク: 解決すべき現在の事象) ────────────
-  app.route("/api/tasks", taskRoutes);
+  // ─── Core: Tasks は Actio に分離 (2026-05-20 split-from-actio) ──
 
   // ─── Core: Calendar (Google Calendar + 手動予定 + プラン) ────
   app.route("/api/calendar", calendar);
@@ -174,11 +168,7 @@ export function createApp() {
   // ─── Module: External API (外部API連携) ─────────────────────
   app.route("/api/external", externalApi);
 
-  // ─── PM (M2) — legacy ActioModule (SDK 移行未) ─────────────
-  const legacyModules: ActioModule[] = [pmModule];
-  for (const mod of legacyModules) {
-    app.route(mod.basePath, mod.routes);
-  }
+  // ─── PM (M2) は Actio に分離 (2026-05-20 split-from-actio) ──
 
   // ─── SDK-based plugin modules (Phase 1: 静的登録) ────────────
   // installModule() は Promise を返すが createApp() 内では await しない (同期構築)。
@@ -224,26 +214,8 @@ export function createApp() {
   app.route("/api/m5", notification);
   // /api/m6 は voting SDK モジュールに移行、/api/voting のみ提供
 
-  // ─── Reservation Plugin Registry ──────────────────────────
-  // 日程調整 (Voting) をプラグイン登録
-  registerReservationPlugin({
-    id: "voting",
-    name: "日程調整",
-    description: "投票で日程を決定",
-    icon: "CalendarCheck",
-    apiBasePath: "/api/voting",
-    frontendPath: "/voting",
-    operations: {
-      list: "/events",
-      create: "/events",
-      cancel: "/events",
-    },
-  });
-
-  // ─── Reservation Plugins API ──────────────────────────────
-  app.get("/api/reservations/plugins", (c) => {
-    return c.json({ plugins: getReservationPlugins() });
-  });
+  // ─── Reservation Plugin Registry は Aedilis に分離 ──────────
+  // (2026-05-20 split-from-actio。 施設予約は Aedilis サービスへ)
 
   // ─── Timetable ─────────────────────────────────────────────
   app.get("/api/timetable", (c) => {
@@ -277,27 +249,20 @@ export function createApp() {
 
   // ─── Health & Info ──────────────────────────────────────────
   app.get("/", (c) => {
-    const registeredModules: Record<string, string> = {};
-    for (const mod of legacyModules) {
-      registeredModules[mod.name] = `${mod.description} - ${mod.basePath}`;
-    }
-
     return c.json({
-      name: "Actio",
-      description: "プラグインベースの予定 (Event) & タスク (Task) 管理プラットフォーム",
+      name: "Schedula",
+      description: "プラグインベースの予定 (Event) / カレンダー管理基盤",
       version: "1.0.0",
       core: {
         auth: "認証 - /api/auth",
         profile: "プロフィール & プロジェクトロール - /api/profile",
         groups: "グループ管理 - /api/groups",
         events: "予定 (時間拘束のある未来の事象) - /api/events",
-        tasks: "タスク (解決すべき現在の事象) - /api/tasks",
         calendar: "カレンダー & 手動予定 - /api/calendar",
         myplans: "マイプラン - /api/myplans",
         smartScheduler: "自動配置スケジューラ - /api/smart-scheduler",
       },
       modules: {
-        ...registeredModules,
         webhooks: "Webhook・リマインド通知 - /api/webhooks",
         voting: "日程調整Voting - /api/voting",
         integrations: "外部サービス連携 (Google Calendar同期・Notion) - /api/integrations",
@@ -309,17 +274,6 @@ export function createApp() {
         path: p.frontendPath,
         managed: p.managed,
       })),
-      taskPlugins: getTaskPlugins().map((p) => ({
-        id: p.id,
-        name: p.name,
-        path: p.frontendPath,
-        managed: p.managed,
-      })),
-      reservationPlugins: getReservationPlugins().map((p) => ({
-        id: p.id,
-        name: p.name,
-        path: p.frontendPath,
-      })),
     });
   });
 
@@ -328,7 +282,7 @@ export function createApp() {
   app.get("/api/health/live", (c) => {
     return c.json({
       status: "ok",
-      service: "actio",
+      service: "schedula",
       timestamp: new Date().toISOString(),
     });
   });
@@ -339,7 +293,7 @@ export function createApp() {
   const readinessHandler = async (c: Context) => {
     const health: Record<string, unknown> = {
       status: "ok",
-      service: "actio",
+      service: "schedula",
       timestamp: new Date().toISOString(),
     };
 

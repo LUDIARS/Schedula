@@ -1,12 +1,14 @@
 /**
- * Schedule module — カレンダー・マイプラン・タスク
+ * Schedule module — カレンダー・マイプラン
+ *
+ * タスク menuGroup は Actio に分離 (2026-05-20 split-from-actio)。
  */
 import type { ModuleDefinition } from "../module-registry";
 
 export const scheduleModule: ModuleDefinition = {
   id: "schedule",
   name: "スケジュール",
-  description: "カレンダー・マイプランは予定、タスクはタスクに分類",
+  description: "カレンダー・マイプランなど予定系機能",
   menuGroups: [
     {
       id: "schedule",
@@ -17,16 +19,6 @@ export const scheduleModule: ModuleDefinition = {
       items: [
         { to: "/calendar", label: "カレンダー", icon: "C", removable: true, order: 0 },
         { to: "/my-plan", label: "マイプラン", icon: "M", removable: true, order: 1 },
-      ],
-    },
-    {
-      id: "tasks",
-      label: "タスク",
-      icon: "T",
-      order: 105,
-      category: "task",
-      items: [
-        { to: "/tasks", label: "タスク", icon: "T", removable: true, order: 0 },
       ],
     },
   ],

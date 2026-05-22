@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { calendarApi, groupApi, myPlanApi, pmApi } from "../lib/api";
-import type { PersonalEvent, PMProject } from "../lib/api-types";
+import { calendarApi, groupApi, myPlanApi } from "../lib/api";
+import type { PersonalEvent } from "../lib/api-types";
 import { HelpButton } from "../components/HelpOverlay";
 import { DAY_LABELS, getPeriodLabel } from "../lib/constants";
 import {
@@ -134,7 +134,6 @@ export function Dashboard() {
   const [googleEvents, setGoogleEvents] = useState<GoogleCalEvent[]>([]);
   const [groupSchedules, setGroupSchedules] = useState<GroupSchedule[]>([]);
   const [myPlans, setMyPlans] = useState<MyPlanEvent[]>([]);
-  const [pmProjects, setPmProjects] = useState<PMProject[]>([]);
   const [loading, setLoading] = useState(true);
 
   const canManage = user?.role === "admin" || user?.role === "group_leader";
@@ -153,20 +152,18 @@ export function Dashboard() {
   const loadData = useCallback(async () => {
     try {
       const logErr = (label: string) => (err: Error) => { console.error(`[Dashboard] ${label}:`, err.message); };
-      const [statusRes, eventsRes, conflictsRes, groupsRes, myPlansRes, pmProjectsRes] = await Promise.all([
+      const [statusRes, eventsRes, conflictsRes, groupsRes, myPlansRes] = await Promise.all([
         calendarApi.getStatus().catch((e: Error) => { logErr("status")(e); return { connected: false, email: "" }; }),
         calendarApi.getPersonalEvents().catch((e: Error) => { logErr("events")(e); return { events: [] }; }),
         calendarApi.getConflicts().catch((e: Error) => { logErr("conflicts")(e); return { conflicts: [] }; }),
         groupApi.listMyGroups().catch((e: Error) => { logErr("groups")(e); return { groups: [] }; }),
         myPlanApi.list().catch((e: Error) => { logErr("plans")(e); return { plans: [] }; }),
-        pmApi.listProjects().catch((e: Error) => { logErr("pm")(e); return { projects: [] }; }),
       ]);
       setConflicts(conflictsRes.conflicts || []);
       setGoogleConnected(statusRes.connected);
       setGoogleEmail(statusRes.email || "");
       setEvents(eventsRes.events || []);
       setMyPlans((myPlansRes.plans || []).filter((p: MyPlanEvent) => p.isActive));
-      setPmProjects(pmProjectsRes.projects || []);
 
       // グループの予定を取得
       const groups = groupsRes.groups || [];
@@ -400,7 +397,7 @@ export function Dashboard() {
           <h1>Dashboard</h1>
           <HelpButton />
         </div>
-        <p>予定とタスクを中心とした統合ダッシュボード</p>
+        <p>予定を中心とした統合ダッシュボード</p>
       </div>
 
       {/* ═════════════════ 予定 (Event) セクション ═════════════════ */}
@@ -736,39 +733,7 @@ export function Dashboard() {
         {renderQuickLinks("event", groupsByCategory.event)}
       </div>
 
-      {/* ═════════════════ タスク (Task) セクション ═════════════════ */}
-      <SectionHeader category="task">
-        {canManage && (
-          <Link
-            to="/admin/modules?category=task"
-            style={{ fontSize: "0.7rem", color: "var(--accent)" }}
-          >
-            モジュール管理 &rarr;
-          </Link>
-        )}
-      </SectionHeader>
-
-      {/* タスクサマリー */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: "0.75rem",
-          marginBottom: "1rem",
-        }}
-      >
-        <div className="card" style={{ padding: "0.75rem 1rem" }}>
-          <div style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "0.2rem" }}>
-            PM プロジェクト
-          </div>
-          <div style={{ fontSize: "1.4rem", fontWeight: 700, color: "var(--text)" }}>
-            {pmProjects.length}
-          </div>
-        </div>
-      </div>
-
-      {/* タスクモジュールのクイックリンク */}
-      {renderQuickLinks("task", groupsByCategory.task)}
+      {/* タスク (Task) セクションは Actio に分離 (2026-05-20 split-from-actio) */}
 
       {/* ═════════════════ その他機能 セクション ═════════════════ */}
       <SectionHeader category="other">
