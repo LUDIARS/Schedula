@@ -14,8 +14,7 @@ import { coreModule } from "./core";
 import { scheduleModule } from "./schedule";
 import { groupModule } from "./group";
 import { m1SchoolModule } from "./m1-school";
-import { reservationModule } from "./reservation";
-import { pmModule } from "./pm";
+// reservation は Aedilis に、pm は Actio に分離 (2026-05-20 split-from-actio)
 import { machinaModule } from "./machina";
 import { notificationModule } from "./notification";
 import { integrationModule } from "./integration";
@@ -33,8 +32,6 @@ export function registerAllModules(): void {
   moduleRegistry.registerModule(scheduleModule);
   moduleRegistry.registerModule(groupModule);
   moduleRegistry.registerModule(m1SchoolModule);
-  moduleRegistry.registerModule(reservationModule);
-  moduleRegistry.registerModule(pmModule);
   moduleRegistry.registerModule(machinaModule);
   moduleRegistry.registerModule(notificationModule);
   moduleRegistry.registerModule(integrationModule);

@@ -9,6 +9,6 @@ import "./calendar.js";
 import "./group.js";
 // myplan.ts は @ludiars/schedula-module-myplan に移行
 // voting.ts は @ludiars/schedula-module-voting に移行
-import "./facility.js";
-import "./pm.js";
+// facility.ts は Aedilis に分離 (2026-05-20 split-from-actio)
+// pm.ts は Actio に分離 (2026-05-20 split-from-actio)
 import "./admin.js";
