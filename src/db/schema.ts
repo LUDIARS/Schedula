@@ -583,6 +583,149 @@ export const votes = sqliteTable(
   ]
 );
 
+// ─── Public Poll (調整さん風 無認証日程調整) ─────────────────
+// 認証なしで使える日程調整。URL は publicId (event 固有 ID) +
+// accessToken (UUIDv4) の両方が揃わないと参照できず、推測による特定を
+// 避ける。adminToken で作成者が管理し、参加者は editKey で自分の回答を
+// 編集する。
+//
+// 個人データ規約 (CLAUDE.md): ここで保持する name は Cernere 管理の
+// ユーザー識別子ではなく、無認証で入力された匿名ゲスト名。Cernere に
+// 情報源が存在しないため、poll ドメイン固有データとして保持する
+// (events.major / calendarAccessId と同じ扱い)。
+
+export const pollEvents = sqliteTable(
+  "poll_events",
+  {
+    id: text("id").primaryKey(),
+    /** URL 用の短い event 固有 ID (推測回避のため accessToken と併用) */
+    publicId: text("public_id").notNull().unique(),
+    /** 閲覧トークン (UUIDv4)。publicId と両方揃わないと参照不可 */
+    accessToken: text("access_token").notNull(),
+    /** 作成者管理トークン (UUIDv4) */
+    adminToken: text("admin_token").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    /** 作成者表示名 (匿名ゲスト名) */
+    creatorName: text("creator_name").notNull().default(""),
+    /** open / closed / finalized */
+    status: text("status").notNull().default("open"),
+    /** 回答締切 (UTC, null = 無期限) */
+    deadline: integer("deadline", { mode: "timestamp" }),
+    /** 締切到達で最多得票を自動確定するか */
+    autoFinalize: integer("auto_finalize", { mode: "boolean" }).notNull().default(true),
+    /** 確定した候補 ID */
+    finalizedCandidateId: text("finalized_candidate_id"),
+    finalizedStartTime: integer("finalized_start_time", { mode: "timestamp" }),
+    finalizedEndTime: integer("finalized_end_time", { mode: "timestamp" }),
+    finalizedAt: integer("finalized_at", { mode: "timestamp" }),
+    /** Discord Webhook URL (credential: 管理画面でのみマスク表示) */
+    discordWebhookUrl: text("discord_webhook_url"),
+    /** Discord 確定通知の送信時刻 (重複送信防止) */
+    discordNotifiedAt: integer("discord_notified_at", { mode: "timestamp" }),
+    /** 開催前リマインドの分前 (JSON number[]、null = リマインドなし) */
+    reminderOffsets: text("reminder_offsets", { mode: "json" }).$type<number[]>(),
+    /** 確定時にコア events へ登録する際の owner (未指定なら登録しない) */
+    calendarOwnerId: text("calendar_owner_id"),
+    /** events 登録時のグループ (任意) */
+    calendarGroupId: text("calendar_group_id"),
+    /** 確定後に作成したコア event の ID */
+    calendarEventId: text("calendar_event_id"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("idx_poll_public_id").on(table.publicId),
+    index("idx_poll_status").on(table.status),
+  ]
+);
+
+export const pollCandidates = sqliteTable(
+  "poll_candidates",
+  {
+    id: text("id").primaryKey(),
+    eventId: text("event_id")
+      .references(() => pollEvents.id)
+      .notNull(),
+    /** 候補開始時刻 (UTC) */
+    startTime: integer("start_time", { mode: "timestamp" }).notNull(),
+    /** 候補終了時刻 (UTC, null = 未指定) */
+    endTime: integer("end_time", { mode: "timestamp" }),
+    /** 任意の表示ラベル (省略時は start/end から整形) */
+    label: text("label").notNull().default(""),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (table) => [index("idx_poll_candidate_event").on(table.eventId)]
+);
+
+export const pollParticipants = sqliteTable(
+  "poll_participants",
+  {
+    id: text("id").primaryKey(),
+    eventId: text("event_id")
+      .references(() => pollEvents.id)
+      .notNull(),
+    /** 匿名ゲスト名 (Cernere 非管理) */
+    name: text("name").notNull(),
+    /** 自分の回答編集用キー (UUIDv4) */
+    editKey: text("edit_key").notNull(),
+    comment: text("comment").notNull().default(""),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .$defaultFn(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("idx_poll_participant_event").on(table.eventId),
+    index("idx_poll_participant_editkey").on(table.editKey),
+  ]
+);
+
+export const pollResponses = sqliteTable(
+  "poll_responses",
+  {
+    id: text("id").primaryKey(),
+    eventId: text("event_id")
+      .references(() => pollEvents.id)
+      .notNull(),
+    participantId: text("participant_id")
+      .references(() => pollParticipants.id)
+      .notNull(),
+    candidateId: text("candidate_id")
+      .references(() => pollCandidates.id)
+      .notNull(),
+    /** ok=○, maybe=△, ng=× */
+    answer: text("answer").notNull(),
+  },
+  (table) => [
+    unique("uniq_poll_response").on(table.participantId, table.candidateId),
+    index("idx_poll_response_event").on(table.eventId),
+  ]
+);
+
+export const pollReminders = sqliteTable(
+  "poll_reminders",
+  {
+    id: text("id").primaryKey(),
+    eventId: text("event_id")
+      .references(() => pollEvents.id)
+      .notNull(),
+    /** 送信予定時刻 (UTC) */
+    remindAt: integer("remind_at", { mode: "timestamp" }).notNull(),
+    /** N 分前 (表示用) */
+    minutesBefore: integer("minutes_before").notNull(),
+    /** 送信済み時刻 (null = 未送信) */
+    sentAt: integer("sent_at", { mode: "timestamp" }),
+  },
+  (table) => [index("idx_poll_reminder_due").on(table.remindAt)]
+);
+
 // ─── M5: Notification Preferences ───────────────────────────
 
 export const notificationPreferences = sqliteTable(

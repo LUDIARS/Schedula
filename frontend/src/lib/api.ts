@@ -35,6 +35,9 @@ import type {
   CocoiruScheduleLinkListResponse,
   CocoiruScheduleLinkCreateResponse,
   CocoiruReportSource,
+  PollCreateInput, PollCreateResponse, PollViewResponse, PollAdminResponse,
+  PollSubmitInput, PollEditInput, PollSubmitResponse, PollSettingsInput,
+  PollFinalizeResponse, PollOkResponse,
 } from "./api-types";
 
 // ─── Session Management ────────────────────────────────────
@@ -1733,5 +1736,91 @@ export const pushApi = {
     return request<{ ok: boolean }>(`/api/push/subscriptions/${id}`, {
       method: "DELETE",
     });
+  },
+};
+
+// ─── Public Poll (調整さん風 無認証日程調整) ──────────────────
+// /api/public-poll は完全に無認証。401 リダイレクトや user cache クリア等の
+// 副作用を持たない専用 fetch ラッパ (publicRequest) を使う。credentials は
+// 送らない (認証 Cookie 不要・推測防止のため token はクエリで渡す)。
+
+async function publicRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const url = `${API_BASE}${path}`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...((options.headers as Record<string, string>) || {}),
+  };
+
+  let res: Response;
+  try {
+    console.log(`[publicPoll] ${options.method || "GET"} ${url}`);
+    res = await fetch(url, { ...options, headers });
+  } catch (err) {
+    console.error(`[publicPoll] ネットワークエラー: ${options.method || "GET"} ${url}`, err);
+    throw new Error(`ネットワークエラー: ${(err as Error).message}`);
+  }
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    console.error(`[publicPoll] HTTPエラー: ${res.status} ${url}`, body);
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+const PUBLIC_POLL_BASE = "/api/public-poll";
+
+export const publicPoll = {
+  createEvent(body: PollCreateInput) {
+    return publicRequest<PollCreateResponse>(`${PUBLIC_POLL_BASE}/events`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  },
+  getEvent(publicId: string, accessToken: string) {
+    return publicRequest<PollViewResponse>(
+      `${PUBLIC_POLL_BASE}/events/${encodeURIComponent(publicId)}?t=${encodeURIComponent(accessToken)}`,
+    );
+  },
+  submitResponse(publicId: string, accessToken: string, body: PollSubmitInput) {
+    return publicRequest<PollSubmitResponse>(
+      `${PUBLIC_POLL_BASE}/events/${encodeURIComponent(publicId)}/responses?t=${encodeURIComponent(accessToken)}`,
+      { method: "POST", body: JSON.stringify(body) },
+    );
+  },
+  editResponse(publicId: string, accessToken: string, body: PollEditInput) {
+    return publicRequest<PollOkResponse>(
+      `${PUBLIC_POLL_BASE}/events/${encodeURIComponent(publicId)}/responses?t=${encodeURIComponent(accessToken)}`,
+      { method: "PUT", body: JSON.stringify(body) },
+    );
+  },
+  getAdmin(publicId: string, adminToken: string) {
+    return publicRequest<PollAdminResponse>(
+      `${PUBLIC_POLL_BASE}/events/${encodeURIComponent(publicId)}/admin?k=${encodeURIComponent(adminToken)}`,
+    );
+  },
+  finalize(publicId: string, adminToken: string, candidateId: string) {
+    return publicRequest<PollFinalizeResponse>(
+      `${PUBLIC_POLL_BASE}/events/${encodeURIComponent(publicId)}/finalize?k=${encodeURIComponent(adminToken)}`,
+      { method: "POST", body: JSON.stringify({ candidateId }) },
+    );
+  },
+  reopen(publicId: string, adminToken: string) {
+    return publicRequest<PollOkResponse>(
+      `${PUBLIC_POLL_BASE}/events/${encodeURIComponent(publicId)}/reopen?k=${encodeURIComponent(adminToken)}`,
+      { method: "POST" },
+    );
+  },
+  updateSettings(publicId: string, adminToken: string, body: PollSettingsInput) {
+    return publicRequest<PollOkResponse>(
+      `${PUBLIC_POLL_BASE}/events/${encodeURIComponent(publicId)}/settings?k=${encodeURIComponent(adminToken)}`,
+      { method: "PUT", body: JSON.stringify(body) },
+    );
+  },
+  deleteEvent(publicId: string, adminToken: string) {
+    return publicRequest<PollOkResponse>(
+      `${PUBLIC_POLL_BASE}/events/${encodeURIComponent(publicId)}?k=${encodeURIComponent(adminToken)}`,
+      { method: "DELETE" },
+    );
   },
 };

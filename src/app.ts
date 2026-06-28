@@ -22,6 +22,8 @@ import { getEventPlugins } from "./event-plugins.js";
 import { secretManager } from "./config/secrets.js";
 import { setupRoutes } from "../modules/setup/routes.js";
 import { profileRoutes } from "../modules/profile/routes.js";
+import { publicPollRoutes } from "../modules/public-poll/routes.js";
+import { startPollSweeper } from "./lib/poll-sweeper.js";
 import { pushRoutes } from "../modules/push/routes.js";
 import { rateLimit } from "./middleware/rate-limit.js";
 import { moduleAdminRoutes } from "./plugins/admin-routes.js";
@@ -118,6 +120,11 @@ export function createApp() {
 
   // ─── Composite Auth (認証不要: ログイン前のユーザーが呼ぶ) ──
   app.route("/api/auth", compositeAuthRoutes);
+
+  // ─── Public Poll (認証不要: 調整さん風 無認証日程調整) ───────
+  // userContext より前にマウントして /api/public-poll 配下を完全無認証に。
+  // URL は publicId + accessToken の両方で保護する。
+  app.route("/api/public-poll", publicPollRoutes);
 
   app.use("/api/*", userContext());
 
@@ -339,6 +346,10 @@ export function createApp() {
 
   // ─── Notification 配信は Nuntius に完全移行済み ──────────────
   // 旧 initNotificationHandler はローカル EventBus 購読用だったが廃止。
+
+  // ─── Public Poll の定期スイーパー (締切自動確定 / 開催前リマインド) ──
+  // テスト環境では no-op (poll-sweeper 側でガード)。
+  startPollSweeper();
 
   return { app, injectWebSocket };
 }

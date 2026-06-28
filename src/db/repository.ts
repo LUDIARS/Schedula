@@ -2286,6 +2286,169 @@ export const eventRepo = {
   },
 };
 
+// ─── Public Poll Repository (調整さん風 無認証日程調整) ────────
+
+export type PollEvent = typeof schema.pollEvents.$inferSelect;
+export type NewPollEvent = typeof schema.pollEvents.$inferInsert;
+export type PollCandidate = typeof schema.pollCandidates.$inferSelect;
+export type NewPollCandidate = typeof schema.pollCandidates.$inferInsert;
+export type PollParticipant = typeof schema.pollParticipants.$inferSelect;
+export type NewPollParticipant = typeof schema.pollParticipants.$inferInsert;
+export type PollResponse = typeof schema.pollResponses.$inferSelect;
+export type NewPollResponse = typeof schema.pollResponses.$inferInsert;
+export type PollReminder = typeof schema.pollReminders.$inferSelect;
+export type NewPollReminder = typeof schema.pollReminders.$inferInsert;
+
+export const publicPollRepo = {
+  // ── events ──
+  async createEvent(data: NewPollEvent): Promise<void> {
+    await db.insert(schema.pollEvents).values(data);
+  },
+
+  async findById(id: string): Promise<PollEvent | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.pollEvents)
+      .where(eq(schema.pollEvents.id, id));
+    return row;
+  },
+
+  async findByPublicId(publicId: string): Promise<PollEvent | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.pollEvents)
+      .where(eq(schema.pollEvents.publicId, publicId));
+    return row;
+  },
+
+  async updateEvent(id: string, data: Partial<Omit<NewPollEvent, "id">>): Promise<void> {
+    await db
+      .update(schema.pollEvents)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.pollEvents.id, id));
+  },
+
+  /** open かつ autoFinalize かつ deadline 超過のイベント (自動確定スイープ用) */
+  async findOpenPastDeadline(now: Date): Promise<PollEvent[]> {
+    return db
+      .select()
+      .from(schema.pollEvents)
+      .where(
+        and(
+          eq(schema.pollEvents.status, "open"),
+          eq(schema.pollEvents.autoFinalize, true),
+          lte(schema.pollEvents.deadline, now),
+        ),
+      );
+  },
+
+  /** イベントと全子レコードを削除 (FK 順) */
+  async deleteEvent(id: string): Promise<void> {
+    await db.delete(schema.pollResponses).where(eq(schema.pollResponses.eventId, id));
+    await db.delete(schema.pollReminders).where(eq(schema.pollReminders.eventId, id));
+    await db.delete(schema.pollParticipants).where(eq(schema.pollParticipants.eventId, id));
+    await db.delete(schema.pollCandidates).where(eq(schema.pollCandidates.eventId, id));
+    await db.delete(schema.pollEvents).where(eq(schema.pollEvents.id, id));
+  },
+
+  // ── candidates ──
+  async addCandidates(rows: NewPollCandidate[]): Promise<void> {
+    if (rows.length === 0) return;
+    await db.insert(schema.pollCandidates).values(rows);
+  },
+
+  async listCandidates(eventId: string): Promise<PollCandidate[]> {
+    return db
+      .select()
+      .from(schema.pollCandidates)
+      .where(eq(schema.pollCandidates.eventId, eventId))
+      .orderBy(schema.pollCandidates.sortOrder);
+  },
+
+  async findCandidateById(id: string): Promise<PollCandidate | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.pollCandidates)
+      .where(eq(schema.pollCandidates.id, id));
+    return row;
+  },
+
+  // ── participants ──
+  async addParticipant(row: NewPollParticipant): Promise<void> {
+    await db.insert(schema.pollParticipants).values(row);
+  },
+
+  async updateParticipant(
+    id: string,
+    data: Partial<Omit<NewPollParticipant, "id">>,
+  ): Promise<void> {
+    await db
+      .update(schema.pollParticipants)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.pollParticipants.id, id));
+  },
+
+  async findParticipantByEditKey(editKey: string): Promise<PollParticipant | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.pollParticipants)
+      .where(eq(schema.pollParticipants.editKey, editKey));
+    return row;
+  },
+
+  async listParticipants(eventId: string): Promise<PollParticipant[]> {
+    return db
+      .select()
+      .from(schema.pollParticipants)
+      .where(eq(schema.pollParticipants.eventId, eventId))
+      .orderBy(schema.pollParticipants.createdAt);
+  },
+
+  // ── responses ──
+  /** 参加者の回答をまとめて置き換える (delete → insert) */
+  async replaceResponses(participantId: string, rows: NewPollResponse[]): Promise<void> {
+    await db
+      .delete(schema.pollResponses)
+      .where(eq(schema.pollResponses.participantId, participantId));
+    if (rows.length > 0) {
+      await db.insert(schema.pollResponses).values(rows);
+    }
+  },
+
+  async listResponses(eventId: string): Promise<PollResponse[]> {
+    return db
+      .select()
+      .from(schema.pollResponses)
+      .where(eq(schema.pollResponses.eventId, eventId));
+  },
+
+  // ── reminders ──
+  async addReminders(rows: NewPollReminder[]): Promise<void> {
+    if (rows.length === 0) return;
+    await db.insert(schema.pollReminders).values(rows);
+  },
+
+  /** 送信予定を過ぎた未送信リマインド */
+  async findDueReminders(now: Date): Promise<PollReminder[]> {
+    return db
+      .select()
+      .from(schema.pollReminders)
+      .where(
+        and(
+          isNull(schema.pollReminders.sentAt),
+          lte(schema.pollReminders.remindAt, now),
+        ),
+      );
+  },
+
+  async markReminderSent(id: string): Promise<void> {
+    await db
+      .update(schema.pollReminders)
+      .set({ sentAt: new Date() })
+      .where(eq(schema.pollReminders.id, id));
+  },
+};
+
 // ─── Core: Task Repository (タスク) ─────────────────────────
 // Actio コア「タスク」: 解決すべき現在の事象。
 
