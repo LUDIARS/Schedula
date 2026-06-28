@@ -25,6 +25,9 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { MachinaPage } from "./pages/MachinaPage";
 import { ModuleManagementPage } from "./pages/ModuleManagementPage";
 import { CocoiruPage } from "./pages/CocoiruPage";
+import { PublicPollCreatePage } from "./pages/PublicPollCreatePage";
+import { PublicPollViewPage } from "./pages/PublicPollViewPage";
+import { PublicPollAdminPage } from "./pages/PublicPollAdminPage";
 import { setupApi } from "./lib/api";
 import { registerAllModules } from "./lib/modules";
 import "./global.css";
@@ -58,6 +61,12 @@ function AppRoutes() {
 
   return (
     <Routes>
+      {/* ─── 無認証 公開ルート (調整さん風 日程調整) ───
+          認証ガード (RequireAuth) / Layout の外側に配置し、ログイン不要で開ける。 */}
+      <Route path="/poll/new" element={<PublicPollCreatePage />} />
+      <Route path="/p/:publicId" element={<PublicPollViewPage />} />
+      <Route path="/p/:publicId/admin" element={<PublicPollAdminPage />} />
+
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route element={<RequireAuth><Layout /></RequireAuth>}>
         <Route index element={<Dashboard />} />

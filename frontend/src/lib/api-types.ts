@@ -656,6 +656,144 @@ export interface VotingUpdateResponse {
   eventId: string;
 }
 
+// ─── Public Poll (調整さん風 無認証日程調整) ────────────────
+
+export type PollAnswer = "ok" | "maybe" | "ng";
+
+export interface PollCandidateView {
+  id: string;
+  startTime: string;
+  endTime: string | null;
+  label: string;
+  sortOrder: number;
+}
+
+export interface PollParticipantView {
+  id: string;
+  name: string;
+  comment: string;
+  /** candidateId -> 回答 */
+  responses: Record<string, PollAnswer>;
+}
+
+export interface PollTallyEntry {
+  candidateId: string;
+  ok: number;
+  maybe: number;
+  ng: number;
+  score: number;
+}
+
+export interface PollEventPublic {
+  publicId: string;
+  title: string;
+  description: string;
+  creatorName: string;
+  status: string;
+  deadline: string | null;
+  autoFinalize: boolean;
+  finalizedCandidateId: string | null;
+  finalizedStartTime: string | null;
+  finalizedEndTime: string | null;
+  discordConfigured: boolean;
+  createdAt: string;
+}
+
+export interface PollEventAdmin extends PollEventPublic {
+  accessToken: string;
+  viewUrl: string | null;
+  discordWebhookMasked: string | null;
+  reminderOffsets: number[];
+  calendarOwnerId: string | null;
+  calendarGroupId: string | null;
+  calendarEventId: string | null;
+}
+
+export interface PollViewResponse {
+  event: PollEventPublic;
+  candidates: PollCandidateView[];
+  participants: PollParticipantView[];
+  tally: PollTallyEntry[];
+}
+
+export interface PollAdminResponse {
+  event: PollEventAdmin;
+  candidates: PollCandidateView[];
+  participants: PollParticipantView[];
+  tally: PollTallyEntry[];
+}
+
+export interface PollCandidateInput {
+  startTime: string;
+  endTime?: string | null;
+  label?: string;
+}
+
+export interface PollCreateInput {
+  title: string;
+  description?: string;
+  creatorName?: string;
+  candidates: PollCandidateInput[];
+  deadline?: string | null;
+  autoFinalize?: boolean;
+  discordWebhookUrl?: string | null;
+  reminderOffsets?: number[];
+  calendarOwnerId?: string | null;
+  calendarGroupId?: string | null;
+}
+
+export interface PollCreateResponse {
+  publicId: string;
+  accessToken: string;
+  adminToken: string;
+  viewUrl: string | null;
+}
+
+export interface PollAnswerInput {
+  candidateId: string;
+  answer: PollAnswer;
+}
+
+export interface PollSubmitInput {
+  name: string;
+  comment?: string;
+  answers: PollAnswerInput[];
+}
+
+export interface PollEditInput {
+  editKey: string;
+  name?: string;
+  comment?: string;
+  answers: PollAnswerInput[];
+}
+
+export interface PollSubmitResponse {
+  participantId: string;
+  editKey: string;
+}
+
+export interface PollSettingsInput {
+  title?: string;
+  description?: string;
+  deadline?: string | null;
+  autoFinalize?: boolean;
+  discordWebhookUrl?: string | null;
+  reminderOffsets?: number[];
+  calendarOwnerId?: string | null;
+  calendarGroupId?: string | null;
+}
+
+export interface PollFinalizeResponse {
+  ok: boolean;
+  finalizedCandidate: PollCandidateView;
+  discordSent: boolean;
+  calendarEventId: string | null;
+}
+
+export interface PollOkResponse {
+  ok: boolean;
+}
+
 // ─── M3 (Legacy Scheduler) ─────────────────────────────────
 
 export interface M3Group {
