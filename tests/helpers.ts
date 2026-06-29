@@ -483,6 +483,87 @@ export function initTestDatabase() {
     );
     CREATE INDEX IF NOT EXISTS idx_wf_target
       ON workflow_transitions(target_type, target_id, performed_at);
+
+    -- ── Core events (public-poll の確定予定登録テスト用) ──
+    CREATE TABLE IF NOT EXISTS events (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      group_id TEXT,
+      title TEXT NOT NULL,
+      description TEXT,
+      start_time INTEGER NOT NULL,
+      end_time INTEGER NOT NULL,
+      is_all_day INTEGER NOT NULL DEFAULT 0,
+      location TEXT,
+      visibility TEXT NOT NULL DEFAULT 'private',
+      plugin_id TEXT,
+      plugin_ref TEXT,
+      plugin_payload TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    -- ── Public Poll (調整さん風 無認証日程調整) ──
+    CREATE TABLE IF NOT EXISTS poll_events (
+      id TEXT PRIMARY KEY,
+      public_id TEXT NOT NULL UNIQUE,
+      access_token TEXT NOT NULL,
+      admin_token TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      creator_name TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'open',
+      deadline INTEGER,
+      auto_finalize INTEGER NOT NULL DEFAULT 1,
+      finalized_candidate_id TEXT,
+      finalized_start_time INTEGER,
+      finalized_end_time INTEGER,
+      finalized_at INTEGER,
+      discord_webhook_url TEXT,
+      discord_notified_at INTEGER,
+      reminder_offsets TEXT,
+      calendar_owner_id TEXT,
+      calendar_group_id TEXT,
+      calendar_event_id TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS poll_candidates (
+      id TEXT PRIMARY KEY,
+      event_id TEXT NOT NULL REFERENCES poll_events(id),
+      start_time INTEGER NOT NULL,
+      end_time INTEGER,
+      label TEXT NOT NULL DEFAULT '',
+      sort_order INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS poll_participants (
+      id TEXT PRIMARY KEY,
+      event_id TEXT NOT NULL REFERENCES poll_events(id),
+      name TEXT NOT NULL,
+      edit_key TEXT NOT NULL,
+      comment TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS poll_responses (
+      id TEXT PRIMARY KEY,
+      event_id TEXT NOT NULL REFERENCES poll_events(id),
+      participant_id TEXT NOT NULL REFERENCES poll_participants(id),
+      candidate_id TEXT NOT NULL REFERENCES poll_candidates(id),
+      answer TEXT NOT NULL,
+      UNIQUE(participant_id, candidate_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS poll_reminders (
+      id TEXT PRIMARY KEY,
+      event_id TEXT NOT NULL REFERENCES poll_events(id),
+      remind_at INTEGER NOT NULL,
+      minutes_before INTEGER NOT NULL,
+      sent_at INTEGER
+    );
   `);
 
   sqlite.close();
