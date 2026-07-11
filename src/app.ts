@@ -8,6 +8,7 @@ import { auth, compositeAuthRoutes } from "./auth/routes.js";
 import { notification } from "../modules/notification/routes.js";
 import { groupRoutes } from "../modules/group/routes.js";
 import { calendar } from "../modules/calendar/routes.js";
+import { p4CalendarRoutes } from "../modules/calendar/p4-routes.js";
 import { eventRoutes } from "../modules/event/routes.js";
 import { placementRoutes } from "../modules/placement/routes.js";
 // myPlan / smart-scheduler / school / schedule(m1) / integrations は SDK module に移行
@@ -155,6 +156,7 @@ export function createApp() {
 
   // ─── Core: Calendar (Google Calendar + 手動予定 + プラン) ────
   app.route("/api/calendar", calendar);
+  app.route("/api/calendar", p4CalendarRoutes);
 
   // ─── Module: Placement (GPS 場所登録 + enter/leave トリガー) ──
   // Imperativus が OwnTracks 経由で受信した位置を /api/placement/locations

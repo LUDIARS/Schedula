@@ -2255,6 +2255,18 @@ export const eventRepo = {
     return row;
   },
 
+  async findByOwnerAndPluginRef(ownerId: string, pluginId: string, pluginRef: string): Promise<Event | undefined> {
+    const [row] = await db
+      .select()
+      .from(schema.events)
+      .where(and(
+        eq(schema.events.ownerId, ownerId),
+        eq(schema.events.pluginId, pluginId),
+        eq(schema.events.pluginRef, pluginRef),
+      ));
+    return row;
+  },
+
   async list(filter: EventListFilter = {}): Promise<Event[]> {
     const conditions: SQL[] = [];
     if (filter.ownerId) conditions.push(eq(schema.events.ownerId, filter.ownerId));
