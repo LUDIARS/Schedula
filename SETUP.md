@@ -46,6 +46,8 @@ JWT_SECRET=your-secret-key-change-in-production
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=http://localhost:8080/api/auth/google/callback
+GOOGLE_CALENDAR_REDIRECT_URI=http://localhost:3000/api/calendar/oauth/callback
+GOOGLE_OAUTH_STATE_SECRET=change-me-to-a-random-secret
 FRONTEND_URL=http://localhost:8080
 ```
 

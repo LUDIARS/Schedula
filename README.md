@@ -1,5 +1,14 @@
 # Schedula
 
+## Google Calendar P4 API
+
+- `GET /api/calendar/oauth/start` and `GET /api/calendar/oauth/callback` implement consent with signed, expiring state.
+- `POST/PATCH/DELETE /api/calendar/events` write through to Google Calendar.
+- `GET /api/calendar/freebusy` merges Google busy intervals with Schedula personal events.
+- `POST /api/calendar/sync` mirrors incremental changes using Google `syncToken`; Calliope-tagged events are excluded from pull mirroring.
+
+Configure `GOOGLE_CALENDAR_REDIRECT_URI` and `GOOGLE_OAUTH_STATE_SECRET` in addition to the Google client credentials.
+
 LUDIARS の **予定 (Event) / カレンダー管理基盤**。 短縮コード: **Sc**
 
 > **このリポジトリは Actio を clone して復活させたもの (2026-05-20)。**

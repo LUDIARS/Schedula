@@ -8,9 +8,11 @@ import {
   groupMemberRepo,
   groupRepo,
   groupScheduleRepo,
+  integrationSettingRepo,
 } from "../../src/db/repository.js";
 import { logActivity } from "../../src/activity-logger.js";
 import { secretManager } from "../../src/config/secrets.js";
+import { getGoogleCalendarAccess, GOOGLE_CALENDAR_SERVICE } from "./connection.js";
 
 // ─── Helper: period → 時刻変換 (09:30 + period * 60min) ─────
 
@@ -28,6 +30,8 @@ const calendar = new Hono();
 // ─── Helper: Google Tokenリフレッシュ ────────────────────────
 
 async function refreshGoogleToken(userId: string): Promise<string | null> {
+  const current = await getGoogleCalendarAccess(userId);
+  if (current) return current.token;
   const user = await userRepo.findById(userId);
 
   if (!user?.googleRefreshToken) return null;
@@ -206,8 +210,16 @@ calendar.get("/status", async (c) => {
   const user = await userRepo.findById(userId);
   if (!user) return c.json({ error: "User not found" }, 404);
 
+  const integration = await integrationSettingRepo.findByUserAndService(userId, GOOGLE_CALENDAR_SERVICE);
+
   // Google OAuth トークンは Cernere 移管済み (legacy フィールド経由のみ参照)
-  const scopes: string[] = (user.googleScopes as string[] | null) || [];
+  const integrationConfig = integration?.config && typeof integration.config === "object" ? integration.config : {};
+  const configuredScopes = "scopes" in integrationConfig && Array.isArray(integrationConfig.scopes)
+    ? (integrationConfig.scopes as unknown[]).filter((item): item is string => typeof item === "string")
+    : [];
+  const scopes: string[] = configuredScopes.length > 0
+    ? configuredScopes
+    : (user.googleScopes as string[] | null) || [];
   const hasCalendarScope = scopes.some((s: string) =>
     s.includes("calendar.readonly") || s.includes("calendar.events")
   );
@@ -217,7 +229,7 @@ calendar.get("/status", async (c) => {
   const info = await getUserInfo(userId);
 
   return c.json({
-    connected: !!user.calendarAccessId,
+    connected: !!integration?.isActive || !!user.calendarAccessId,
     email: info.email,
     hasGoogleAuth: !!user.googleId,
     googleScopes: scopes,
@@ -233,6 +245,8 @@ calendar.post("/disconnect", async (c) => {
 
   // 認証は Cernere 委譲済み - パスワード設定確認は不要
   // calendarAccessId のみクリア (個人データ Cernere 移管ルール)
+  const integration = await integrationSettingRepo.findByUserAndService(userId, GOOGLE_CALENDAR_SERVICE);
+  if (integration) await integrationSettingRepo.deleteById(integration.id);
   await userRepo.update(userId, {
     calendarAccessId: null,
     updatedAt: new Date(),
