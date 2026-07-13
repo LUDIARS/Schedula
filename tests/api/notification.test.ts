@@ -10,6 +10,7 @@ import {
 let app: any;
 
 const USER_ID = "user-notif-1";
+const OTHER_USER_ID = "user-notif-2";
 
 beforeAll(async () => {
   initTestDatabase();
@@ -20,6 +21,7 @@ beforeAll(async () => {
 beforeEach(() => {
   clearTestDatabase();
   insertTestUser({ id: USER_ID, name: "NotifUser", email: "notif@test.com" });
+  insertTestUser({ id: OTHER_USER_ID, name: "OtherNotifUser", email: "other-notif@test.com" });
 });
 
 const token = generateTestToken(USER_ID);
@@ -175,5 +177,96 @@ describe("Webhook CRUD", () => {
 
     expect(status).toBe(200);
     expect(json.logs).toBeDefined();
+  });
+});
+
+describe("Webhook authorization", () => {
+  async function createWebhook(userId = USER_ID) {
+    const { status, json } = await request(app, "POST", "/api/webhooks/webhooks", {
+      headers: { "X-User-Id": userId },
+      body: { url: "https://example.com/private-hook", events: ["*"] },
+    });
+
+    expect(status).toBe(201);
+    return json;
+  }
+
+  it("denies anonymous list requests without leaking webhooks", async () => {
+    const webhook = await createWebhook();
+
+    const { status, json } = await request(app, "GET", "/api/webhooks/webhooks");
+
+    expect(status).toBe(401);
+    expect(json.webhooks).toBeUndefined();
+    expect(JSON.stringify(json)).not.toContain(webhook.id);
+    expect(JSON.stringify(json)).not.toContain(webhook.url);
+  });
+
+  it("denies anonymous access to every webhook endpoint", async () => {
+    const webhook = await createWebhook();
+    const endpointRequests = [
+      request(app, "POST", "/api/webhooks/webhooks", {
+        body: { url: "https://example.com/anonymous", events: ["*"] },
+      }),
+      request(app, "PUT", `/api/webhooks/webhooks/${webhook.id}`, {
+        body: { url: "https://example.com/anonymous" },
+      }),
+      request(app, "DELETE", `/api/webhooks/webhooks/${webhook.id}`),
+      request(app, "POST", `/api/webhooks/webhooks/${webhook.id}/test`),
+      request(app, "POST", `/api/webhooks/webhooks/${webhook.id}/rotate-secret`),
+      request(app, "GET", `/api/webhooks/webhooks/${webhook.id}/logs`),
+    ];
+
+    for (const response of await Promise.all(endpointRequests)) {
+      expect(response.status).toBe(401);
+    }
+  });
+
+  it("does not allow another user to access a webhook by ID", async () => {
+    const webhook = await createWebhook();
+    const otherUser = { headers: { "X-User-Id": OTHER_USER_ID } };
+    const otherUserList = await request(app, "GET", "/api/webhooks/webhooks", otherUser);
+    expect(otherUserList.status).toBe(200);
+    expect(otherUserList.json.webhooks).toEqual([]);
+
+    const endpointRequests = [
+      request(app, "PUT", `/api/webhooks/webhooks/${webhook.id}`, {
+        ...otherUser,
+        body: { url: "https://example.com/other-user" },
+      }),
+      request(app, "DELETE", `/api/webhooks/webhooks/${webhook.id}`, otherUser),
+      request(app, "POST", `/api/webhooks/webhooks/${webhook.id}/test`, otherUser),
+      request(app, "POST", `/api/webhooks/webhooks/${webhook.id}/rotate-secret`, otherUser),
+      request(app, "GET", `/api/webhooks/webhooks/${webhook.id}/logs`, otherUser),
+    ];
+
+    for (const response of await Promise.all(endpointRequests)) {
+      expect(response.status).toBe(404);
+      expect(JSON.stringify(response.json)).not.toContain(webhook.id);
+      expect(JSON.stringify(response.json)).not.toContain(webhook.secret);
+    }
+  });
+
+  it("allows the webhook owner to update, rotate, read logs, and delete", async () => {
+    const webhook = await createWebhook();
+    const owner = { headers: { "X-User-Id": USER_ID } };
+
+    const update = await request(app, "PUT", `/api/webhooks/webhooks/${webhook.id}`, {
+      ...owner,
+      body: { url: "https://example.com/owner-updated" },
+    });
+    expect(update.status).toBe(200);
+    expect(update.json.url).toBe("https://example.com/owner-updated");
+
+    const rotate = await request(app, "POST", `/api/webhooks/webhooks/${webhook.id}/rotate-secret`, owner);
+    expect(rotate.status).toBe(200);
+    expect(rotate.json.secret).not.toBe(webhook.secret);
+
+    const logs = await request(app, "GET", `/api/webhooks/webhooks/${webhook.id}/logs`, owner);
+    expect(logs.status).toBe(200);
+    expect(logs.json.logs).toEqual([]);
+
+    const deletion = await request(app, "DELETE", `/api/webhooks/webhooks/${webhook.id}`, owner);
+    expect(deletion.status).toBe(200);
   });
 });
