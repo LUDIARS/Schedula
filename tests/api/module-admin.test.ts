@@ -55,6 +55,18 @@ describe("GET /api/admin/modules", () => {
   });
 });
 
+describe("POST /api/admin/modules/install-package", () => {
+  it("should reject a general user", async () => {
+    insertTestUser({ id: "u1", name: "U1", email: "u1@test.com", role: "general" });
+    const token = generateTestToken("u1", "general");
+    const { status } = await request(app, "POST", "/api/admin/modules/install-package", {
+      token,
+      body: { packageName: "@ludiars/example", packageVersion: "1.0.0" },
+    });
+    expect(status).toBe(403);
+  });
+});
+
 describe("POST /api/admin/modules/:id/disable and enable", () => {
   beforeEach(() => {
     insertTestUser({ id: "admin-1", name: "Admin", email: "admin@test.com", role: "admin" });

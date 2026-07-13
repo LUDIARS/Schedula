@@ -7,6 +7,8 @@
 import { mkdirSync } from "fs";
 import { resolve } from "path";
 
+process.env.NODE_ENV = "test";
+
 // テスト用DBパスを設定（各テスト実行ごとにユニーク）
 const testDbPath = resolve("data", `test-${process.pid}.db`);
 mkdirSync(resolve("data"), { recursive: true });
