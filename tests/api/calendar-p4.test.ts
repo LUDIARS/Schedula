@@ -68,6 +68,14 @@ describe("P4 calendar routes", () => {
     });
   });
 
+  it("rejects freeBusy ranges longer than 366 days", async () => {
+    const response = await request(app, "GET",
+      "/api/calendar/freebusy?timeMin=2026-01-01T00%3A00%3A00.000Z&timeMax=2027-01-03T00%3A00%3A00.000Z",
+      { token });
+    expect(response.status).toBe(400);
+    expect(response.json).toEqual({ error: "freebusy_range_exceeds_maximum", maxDays: 366 });
+  });
+
   it("completes consent and writes a tagged Google event", async () => {
     const start = await request(app, "GET", "/api/calendar/oauth/start", { token });
     expect(start.status).toBe(200);

@@ -23,6 +23,14 @@ import {
 import { createOAuthState, verifyOAuthState } from "./oauth-state.js";
 
 const GOOGLE_PLUGIN = "calendar-google";
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * A free/busy query is limited to one leap year because recurringBusy expands
+ * local events one day at a time before optionally calling Google Calendar.
+ */
+const MAX_FREEBUSY_RANGE_DAYS = 366;
+const MAX_FREEBUSY_RANGE_MS = MAX_FREEBUSY_RANGE_DAYS * DAY_MS;
 
 function stateSecret(): string {
   return secretManager.getRequired("GOOGLE_OAUTH_STATE_SECRET");
@@ -227,6 +235,9 @@ p4CalendarRoutes.get("/freebusy", async (c) => {
   if (!userId) return c.json({ error: "Authentication required" }, 401);
   const range = rangeFromQuery(c);
   if (!range) return c.json({ error: "valid_time_range_required" }, 400);
+  if (range.to.getTime() - range.from.getTime() > MAX_FREEBUSY_RANGE_MS) {
+    return c.json({ error: "freebusy_range_exceeds_maximum", maxDays: MAX_FREEBUSY_RANGE_DAYS }, 400);
+  }
   const local = recurringBusy(await personalEventRepo.findByUserId(userId), range.from, range.to);
   try {
     const connection = await getGoogleCalendarAccess(userId);

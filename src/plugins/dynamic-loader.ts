@@ -19,6 +19,7 @@
 import { Hono } from "hono";
 import type { ModuleDefinition } from "@ludiars/schedula-sdk";
 import { installModule, ModuleLoadError } from "./loader.js";
+import { requireSystemAdminMiddleware } from "./permissions.js";
 
 export interface DynamicInstallRequest {
   /** `@scope/name` / `@scope/name@version` 形式のパッケージ指定. */
@@ -57,6 +58,7 @@ export async function loadPackageAsModule(
  */
 export function dynamicInstallRoutes(app: import("hono").Hono): void {
   const sub = new Hono();
+  sub.use("*", requireSystemAdminMiddleware());
   sub.post("/", async (c) => {
     const body = await c.req.json().catch(() => null) as DynamicInstallRequest | null;
     if (!body || !body.packageName || !body.packageVersion) {
