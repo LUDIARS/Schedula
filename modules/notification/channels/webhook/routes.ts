@@ -1,17 +1,39 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { randomBytes } from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import {
   webhookEndpointRepo,
   webhookDeliveryLogRepo,
 } from "../../../../src/db/repository.js";
+import type { WebhookEndpoint } from "../../../../src/db/repository.js";
 import { getUserId } from "../../../../src/middleware/getUserId.js";
 import type { NotificationPlatform, SendMethod } from "../../../../src/shared/constants.js";
 
 const webhookRoutes = new Hono();
 
+type OwnedWebhookResult =
+  | { webhook: WebhookEndpoint }
+  | { response: Response };
+
+async function getOwnedWebhook(c: Context, id: string): Promise<OwnedWebhookResult> {
+  const userId = getUserId(c);
+  if (!userId) {
+    return { response: c.json({ error: "Authentication required" }, 401) };
+  }
+
+  const webhook = await webhookEndpointRepo.findById(id);
+  if (!webhook || webhook.createdBy !== userId) {
+    return { response: c.json({ error: "Webhook not found" }, 404) };
+  }
+
+  return { webhook };
+}
+
 // ─── POST /webhooks ─────────────────────────────────────────
 webhookRoutes.post("/", async (c) => {
+  const createdBy = getUserId(c);
+  if (!createdBy) return c.json({ error: "Authentication required" }, 401);
+
   const body = await c.req.json<{
     url: string;
     events: string[];
@@ -20,8 +42,6 @@ webhookRoutes.post("/", async (c) => {
     botToken?: string;
     channelId?: string;
   }>();
-  const createdBy = getUserId(c);
-  if (!createdBy) return c.json({ error: "Authentication required" }, 401);
 
   const secret = randomBytes(32).toString("hex");
 
@@ -56,10 +76,9 @@ webhookRoutes.post("/", async (c) => {
 // ─── GET /webhooks ──────────────────────────────────────────
 webhookRoutes.get("/", async (c) => {
   const createdBy = getUserId(c);
+  if (!createdBy) return c.json({ error: "Authentication required" }, 401);
 
-  const webhooks = createdBy
-    ? await webhookEndpointRepo.findByCreatedBy(createdBy)
-    : await webhookEndpointRepo.findAll();
+  const webhooks = await webhookEndpointRepo.findByCreatedBy(createdBy);
 
   // Don't expose secrets or bot tokens in listing
   return c.json({
@@ -81,6 +100,9 @@ webhookRoutes.get("/", async (c) => {
 // ─── PUT /webhooks/:id ──────────────────────────────────────
 webhookRoutes.put("/:id", async (c) => {
   const id = c.req.param("id");
+  const owned = await getOwnedWebhook(c, id);
+  if ("response" in owned) return owned.response;
+
   const body = await c.req.json<{
     url?: string;
     events?: string[];
@@ -90,12 +112,7 @@ webhookRoutes.put("/:id", async (c) => {
     channelId?: string;
     isActive?: boolean;
   }>();
-
-  const current = await webhookEndpointRepo.findById(id);
-
-  if (!current) {
-    return c.json({ error: "Webhook not found" }, 404);
-  }
+  const current = owned.webhook;
 
   const updated = await webhookEndpointRepo.update(id, {
     url: body.url ?? current.url,
@@ -121,6 +138,9 @@ webhookRoutes.put("/:id", async (c) => {
 // ─── DELETE /webhooks/:id ───────────────────────────────────
 webhookRoutes.delete("/:id", async (c) => {
   const id = c.req.param("id");
+  const owned = await getOwnedWebhook(c, id);
+  if ("response" in owned) return owned.response;
+
   const deleted = await webhookEndpointRepo.deleteById(id);
 
   if (!deleted) {
@@ -133,14 +153,21 @@ webhookRoutes.delete("/:id", async (c) => {
 // ─── POST /webhooks/:id/test (廃止) ─────────────────────────
 // 配信は Nuntius 側で実行される。Actio 側のテスト配信は提供しない。
 webhookRoutes.post("/:id/test", (c) => {
-  return c.json({
-    error: "Webhook test send is no longer supported. Configure delivery via Nuntius topics.",
-  }, 501);
+  return getOwnedWebhook(c, c.req.param("id")).then((owned) => {
+    if ("response" in owned) return owned.response;
+
+    return c.json({
+      error: "Webhook test send is no longer supported. Configure delivery via Nuntius topics.",
+    }, 501);
+  });
 });
 
 // ─── POST /webhooks/:id/rotate-secret ───────────────────────
 webhookRoutes.post("/:id/rotate-secret", async (c) => {
   const id = c.req.param("id");
+  const owned = await getOwnedWebhook(c, id);
+  if ("response" in owned) return owned.response;
+
   const newSecret = randomBytes(32).toString("hex");
 
   const updated = await webhookEndpointRepo.update(id, { secret: newSecret });
@@ -159,6 +186,9 @@ webhookRoutes.post("/:id/rotate-secret", async (c) => {
 // ─── GET /webhooks/:id/logs ─────────────────────────────────
 webhookRoutes.get("/:id/logs", async (c) => {
   const id = c.req.param("id");
+  const owned = await getOwnedWebhook(c, id);
+  if ("response" in owned) return owned.response;
+
   const logs = await webhookDeliveryLogRepo.findByWebhookId(id);
   return c.json({ logs });
 });
