@@ -1,0 +1,14 @@
+{
+  "name": "identity-sdk",
+  "description": "Cernere Identity Service の SDK (submodule)。 認証ルート・トークン・キャッシュを外部サービス向けに提供する共有実装。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)packages/(?!sdk/)(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)services/(?:.*/)?[^/]+$"
+    }
+  ]
+}

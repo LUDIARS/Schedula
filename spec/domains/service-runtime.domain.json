@@ -1,0 +1,26 @@
+{
+  "name": "service-runtime",
+  "description": "プロセスとしての Schedula。 起動と配線、 ミドルウェア、 共有ユーティリティ、 活動ログ。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/lib/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/middleware/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/shared/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/(?:index|app|activity-logger|service-adapter)\\.ts$"
+    },
+    {
+      "pathPattern": "(^|/)tests?/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)scripts/(?:.*/)?[^/]+$"
+    }
+  ]
+}

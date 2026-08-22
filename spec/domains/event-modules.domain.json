@@ -1,0 +1,14 @@
+{
+  "name": "event-modules",
+  "description": "予定・イベント種別ごとのプラグイン実装。 個々の予定の振る舞いをモジュール単位で閉じる。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/plugins/(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)src/event-plugins\\.ts$"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "module-sdk",
+  "description": "Schedula モジュール SDK (packages/sdk)。 defineModule と ModuleContext の型・テスト用モックを外部モジュールへ提供する。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)packages/sdk/(?:.*/)?[^/]+$"
+    }
+  ]
+}

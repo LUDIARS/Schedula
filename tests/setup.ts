@@ -11,6 +11,12 @@ import { resolve } from "path";
 const testDbPath = resolve("data", `test-${process.pid}.db`);
 mkdirSync(resolve("data"), { recursive: true });
 
+// 実行環境が NODE_ENV=production を export していてもテストは test 環境として
+// 走らせる。production では userContext() の X-User-Id フォールバックと
+// admin role の JWT フォールバックが無効化され (fail-closed)、テストが
+// 認証できなくなるため。
+process.env.NODE_ENV = "test";
+
 process.env.DATABASE_PATH = testDbPath;
 process.env.DB_DIALECT = "sqlite";
 process.env.JWT_SECRET = "test-secret-key-for-testing";

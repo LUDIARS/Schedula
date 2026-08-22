@@ -115,7 +115,9 @@ git clone https://github.com/LUDIARS/Schedula.git
 cd Schedula
 
 # GitHub Packages 認証 (@ludiars/schedula-module-* を取得するため)
-export NODE_AUTH_TOKEN=<your_gh_pat>
+# リポジトリの .npmrc は registry のみを指定し、トークンは持たない。
+# 認証はユーザ設定 (~/.npmrc) 側に登録する。
+npm config set //npm.pkg.github.com/:_authToken <your_gh_pat>
 
 npm install
 cd frontend && npm install && cd ..

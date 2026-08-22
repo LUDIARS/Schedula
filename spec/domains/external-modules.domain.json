@@ -1,0 +1,14 @@
+{
+  "name": "external-modules",
+  "description": "外部配布の予定モジュールと、その実装例。 本体とは別配布されるモジュール群の置き場。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)modules/(?!calendar/)(?:.*/)?[^/]+$"
+    },
+    {
+      "pathPattern": "(^|/)modules-ext/(?:.*/)?[^/]+$"
+    }
+  ]
+}

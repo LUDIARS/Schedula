@@ -1,0 +1,11 @@
+{
+  "name": "identity-access",
+  "description": "認証と権限。 本人性と操作の許可。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)src/auth/(?:.*/)?[^/]+$"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "calendar-sync",
+  "description": "外部カレンダーとの同期。 双方向反映と競合の扱い。",
+  "presetRules": [],
+  "templateRules": [],
+  "membership": [
+    {
+      "pathPattern": "(^|/)modules/calendar/(?:.*/)?[^/]+$"
+    }
+  ]
+}
